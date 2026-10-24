@@ -7,28 +7,28 @@ require "json"
 class Reclaim < Formula
   desc "Reclaim command line: every product action through the public API contract"
   homepage "https://github.com/mobile-club/reclaim-cli"
-  version "0.25.0"
+  version "0.26.0"
   license :cannot_represent
 
   on_macos do
     on_arm do
-      url "https://github.com/mobile-club/reclaim-cli/releases/download/v0.25.0/reclaim-0.25.0-darwin-arm64.tar.gz"
-      sha256 "8dd7873e6b163af0d155a3f3c9fe3d2b8ddc9c65e8ce2547349df1df3fead05f"
+      url "https://github.com/mobile-club/reclaim-cli/releases/download/v0.26.0/reclaim-0.26.0-darwin-arm64.tar.gz"
+      sha256 "2c5c73ab816ef57868b765f3f44eba6811a6d3d516fba093a320e42a991751d9"
     end
     on_intel do
-      url "https://github.com/mobile-club/reclaim-cli/releases/download/v0.25.0/reclaim-0.25.0-darwin-x64.tar.gz"
-      sha256 "9ad8c9e749de231bfc5b98d1b5f75b5f1a878ae91a1589fb62f453e7f03e01c0"
+      url "https://github.com/mobile-club/reclaim-cli/releases/download/v0.26.0/reclaim-0.26.0-darwin-x64.tar.gz"
+      sha256 "e4e3f62033ed03758a2b68ef85f0f1dfa33e11749c2e4f5cf543892507b871e1"
     end
   end
 
   on_linux do
     on_arm do
-      url "https://github.com/mobile-club/reclaim-cli/releases/download/v0.25.0/reclaim-0.25.0-linux-arm64.tar.gz"
-      sha256 "6d01c40ff60f383681ae3a2821fe519dad5c052975a656b38757a940367415d1"
+      url "https://github.com/mobile-club/reclaim-cli/releases/download/v0.26.0/reclaim-0.26.0-linux-arm64.tar.gz"
+      sha256 "79d523aadd7549d42c27b62bb3aa8a2638d7da77a120ba9b7b11f1ac2b63141e"
     end
     on_intel do
-      url "https://github.com/mobile-club/reclaim-cli/releases/download/v0.25.0/reclaim-0.25.0-linux-x64.tar.gz"
-      sha256 "7e48dc68ce5b6ae68b0371b0decc87f18bd7b519c5c09c80aae88cf49991d57d"
+      url "https://github.com/mobile-club/reclaim-cli/releases/download/v0.26.0/reclaim-0.26.0-linux-x64.tar.gz"
+      sha256 "caa41358d7156aff6f1da5100b699abae06a1c42ada12f74b025f476eefeee08"
     end
   end
 
