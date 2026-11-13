@@ -1,0 +1,126 @@
+name: org-conventions
+
+# The convention check of the organisation (NMC-3958). The rules are in
+# docs/org-conventions.md of mobile-club/metarepo.
+#
+# The check reads the title of the pull request and the subject of each of its
+# commits. It turns red on a French marker word, and on a subject that is not
+# `type(scope): summary`. A French marker word in the body gives a warning only.
+# It skips a bot author, a merge commit and a revert commit (Revert or Reapply).
+#
+# This file is self-contained on purpose. The metarepo is private, so a
+# repository of another organisation cannot call a reusable workflow of it.
+# bin/rollout copies this file as it is. Do not add a checkout, an action or an
+# install: the job reads the event payload and calls `gh api` one time.
+#
+# The check is not a required check. Do not add it to a ruleset or to a branch
+# protection.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  conventions:
+    name: conventions
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Check the PR title and the commit subjects
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_AUTHOR_TYPE: ${{ github.event.pull_request.user.type }}
+        run: |
+          cat > "$RUNNER_TEMP/conventions.mjs" <<'CHECK'
+          import { readFileSync } from "node:fs";
+
+          const FRENCH = new Set([
+            "à", "afin", "ajout", "ajoute", "ajouter", "ajoutée", "ainsi", "après", "apres", "au", "aussi", "avec",
+            "cette", "ces", "côté", "correctif", "corrige", "corriger", "dans", "de", "déjà", "deja", "depuis",
+            "des", "du", "elle", "être", "etre", "erreur", "fichier", "jour", "la", "le", "les", "lorsque", "mais",
+            "même", "mise", "monolithe", "nous", "nouveau", "nouvelle", "où", "pas", "plusieurs", "pour",
+            "problème", "probleme", "quand", "que", "qui", "sont", "supprime", "supprimer", "suppression",
+            "toujours", "très", "tres", "une", "vous",
+          ]);
+          const ELISION = /^(?:l|d|qu|j|n|c|s)['’]\p{L}/u;
+          const TYPES = ["build", "chore", "ci", "docs", "feat", "fix", "perf", "refactor", "revert", "style", "test"];
+          const FORMAT = new RegExp(`^(?:${TYPES.join("|")})\\([^()\\s][^()]*\\)!?: \\S`);
+          const PREFIX = /^[a-z]+(?:\([^()]*\))?!?:\s*/i;
+
+          const env = process.env;
+          const errors = [];
+          const warnings = [];
+
+          const esc = (s) => String(s).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+
+          function strip(text) {
+            return text
+              .replace(/```[\s\S]*?```/g, " ")
+              .replace(/`[^`\n]*`/g, " ")
+              .replace(/https?:\/\/\S+/g, " ")
+              .replace(/"[^"\n]*"/g, " ")
+              .replace(/“[^”\n]*”/g, " ")
+              .replace(/(^|[^\p{L}\p{N}'’])'[^'\n]*'(?![\p{L}\p{N}])/gu, "$1 ")
+              .replace(/«[^»\n]*»/g, " ");
+          }
+
+          function frenchWords(text) {
+            const found = [];
+            for (const raw of strip(text.normalize("NFC")).toLowerCase().split(/[^\p{L}\p{N}_'’-]+/u)) {
+              const word = raw.replace(/^['’-]+|['’-]+$/g, "");
+              if (!word) continue;
+              if (FRENCH.has(word) || ELISION.test(word)) found.push(word);
+            }
+            return [...new Set(found)];
+          }
+
+          function checkSubject(where, line, subject = line) {
+            if (!FORMAT.test(subject)) errors.push({ what: `Bad format of the ${where}`, line, why: "the format is type(scope): English imperative summary" });
+            const french = frenchWords(subject.replace(PREFIX, ""));
+            if (french.length) errors.push({ what: `French word in the ${where}`, line, why: `French: ${french.join(", ")}` });
+          }
+
+          const isBot = (login, type) => type === "Bot" || /\[bot\]$/i.test(login || "");
+          const isRevert = (line) => /^(?:Revert|Reapply) "/.test(line);
+
+          if (isBot(env.PR_AUTHOR, env.PR_AUTHOR_TYPE)) {
+            console.log(`The author ${env.PR_AUTHOR} is a bot. The check skips this pull request.`);
+            process.exit(0);
+          }
+
+          const title = env.PR_TITLE || "";
+          if (!isRevert(title)) checkSubject("PR title", title);
+
+          for (const line of readFileSync(0, "utf8").split("\n")) {
+            if (!line.trim()) continue;
+            const c = JSON.parse(line);
+            const subject = String(c.message || "").split("\n")[0].trim();
+            if (c.parents > 1 || /^Merge /.test(subject) || isRevert(subject)) continue;
+            if (isBot(c.login, c.type) || /\[bot\]$/i.test(c.name || "")) continue;
+            checkSubject("commit subject", `${String(c.sha).slice(0, 7)} ${subject}`, subject);
+          }
+
+          const body = (env.PR_BODY || "").replace(/```[\s\S]*?```/g, "");
+          for (const line of body.split(/\r?\n/)) {
+            if (/^\s*>/.test(line)) continue;
+            const french = frenchWords(line);
+            if (french.length) warnings.push({ what: "French word in the PR body", line: line.trim(), why: `French: ${french.join(", ")}` });
+          }
+
+          for (const e of errors) console.log(`::error title=${e.what}::${esc(`${e.line} (${e.why})`)}`);
+          for (const w of warnings) console.log(`::warning title=${w.what}::${esc(`${w.line} (${w.why})`)}`);
+          process.exit(errors.length ? 1 : 0);
+          CHECK
+          gh api "repos/$REPO/pulls/$PR_NUMBER/commits" --paginate \
+            --jq '.[] | {sha, message: .commit.message, login: (.author.login // ""), type: (.author.type // ""), name: (.commit.author.name // ""), parents: (.parents | length)} | tojson' \
+            | node "$RUNNER_TEMP/conventions.mjs"
